@@ -1,0 +1,378 @@
+I have spent 2 days fiddling with this code, and countless hours (months even) over past 10 years using SigPlus/SigWeb from Topaz.
+And when I stumbled upon Scott's answer here, I just had to make it work. Unfortunately, @ScottG made few crucial mistakes so it didn't work out of the box, and my colleagues that tried it also failed due to lack of documentation. So my answer is 99% built on Scott's code and input, but I am adding:
+- sample SigString to work with
+- fixes that needed to be done
+- requirements
+- more comments
+- SigString structure explained
+- bonus code for HTML5 canvas
+
+Anyway, since the whole story needs to be told, so I am putting the whole example here, not just the (fixed) PHP function.
+If you are anxcious to just copy/paste code and move on - skip to actual code. If you want to learn how it works, read it all.
+
+First we need to know that this code (just like Scott's from which it had been built) works only if SigString is neither compressed nor encrypted. If you have previous database of signatures, it's time to convert those to uncompressed/unencrypted ones. This is first step, and reason why others gave up on Scott's code right away. Unfortunately explaining compression/decompression is out of scope of this answer, and does need Windows OS + SigWeb or SigPlus, so please consult official docs at https://www.topazsystems.com/software/download/sigweb.pdf . I did not try to reverse compression format, it is possible Topaz just uses something like zip/gzip/bzip etc, but I didn't have more time (for now), so to make my life easier I just converted sample of (compressed) SigStrings I was given from SetSigCompressionMode(1) ("1" = Lossless compression at a 4 to 1 ratio) to SetSigCompressionMode(0) (no compression) using SigWeb and Windows machine. Again, you HAVE TO use no compression if you want to make it work with this code! Same goes for encryption I guess, if you use Topaz SigWeb/SigPlus built-in encryption, you'd be advised to decrypt the database once, and in future use your own encryption code. On to the samples now.
+
+Here is example SigString generated with Topaz tablet, saved by using SetSigCompressionMode(1) ("1" = Lossless compression at a 4 to 1 ratio):
+
+04002900C301E101FFFF00FF00FE00FD01FC00FA01FA02F802F803F704F604F604F604F503F502F402F402F301F300F301F200F300F201F100F200F100F100F202F202F203F303F305F404F504F604F703FA01FD01FF000034000902600000FF01FF01FF01FE010001000101000201030103010502070207030803080408040A060A060B070E080D070D060E060E050E050E050E040F030E030D020E020E010E010D010D010C010B010B010A010A000800070006FF0400040001FF01FF000000000000001B005A02F700FF00FE02FE02FD03FC02FC02FA02F900F801F6FFF500F5FEF5FFF5FEF7FEF8FEF9FEFBFEFCFEFDFEFEFE00FF00FF0000010000004D000803A1010000FF010000FF00FFFEFFFEFEFCFFFCFEFCFEFAFDFAFEF8FDF8FCF7FCF6FBF6FCF6FBF5FCF5FCF5FBF5FDF5FCF5FDF4FCF4FDF5FDF4FDF4FEF5FEF5FFF500F600F501F701F702F804F804F904FA06FB08FB09FD0BFD0DFF0C010D020E020C040E040C050B0509060807060805080308020801080009FF08FE08FD08FC07FB06FB06F805F703F402F301F100F1FEF2FEF6FEFBFEFE000000
+
+This is same SigString converted to SetSigCompressionMode(0) (no compression):
+
+3139370D0A340D0A343531203438310D0A343530203438300D0A343530203437390D0A343530203437370D0A343530203437340D0A343531203437300D0A343531203436340D0A343532203435380D0A343534203435300D0A343536203434320D0A343539203433330D0A343633203432330D0A343637203431330D0A343731203430330D0A343735203339320D0A343738203338310D0A343830203336390D0A343832203335370D0A343834203334340D0A343835203333310D0A343835203331380D0A343836203330340D0A343836203239310D0A343836203237370D0A343837203236320D0A343837203234380D0A343837203233330D0A343837203231380D0A343837203230340D0A343839203139300D0A343931203137360D0A343934203136330D0A343937203135300D0A353032203133380D0A353036203132370D0A353130203131370D0A353134203130380D0A353137203130320D0A3531382039390D0A3531392039380D0A3531392039380D0A3532312039360D0A3532312039350D0A3532322039340D0A3532332039330D0A3532342039310D0A3532352039310D0A3532362039310D0A3532372039320D0A3532372039340D0A3532382039370D0A353239203130300D0A353330203130350D0A353332203131320D0A353334203131390D0A353337203132370D0A353430203133350D0A353434203134330D0A353438203135330D0A353534203136330D0A353630203137340D0A353637203138380D0A353735203230310D0A353832203231340D0A353838203232380D0A353934203234320D0A353939203235360D0A363034203237300D0A363039203238340D0A363133203239390D0A363136203331330D0A363139203332360D0A363231203334300D0A363233203335340D0A363234203336380D0A363235203338310D0A363236203339340D0A363237203430360D0A363238203431370D0A363239203432380D0A363330203433380D0A363331203434380D0A363331203435360D0A363331203436330D0A363331203436390D0A363330203437330D0A363330203437370D0A363330203437380D0A363239203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363032203234370D0A363031203234370D0A353939203234390D0A353937203235310D0A353934203235340D0A353930203235360D0A353836203235380D0A353830203236300D0A353733203236300D0A353635203236310D0A353535203236300D0A353434203236300D0A353333203235380D0A353232203235370D0A353131203235350D0A353032203235330D0A343934203235310D0A343837203234390D0A343832203234370D0A343738203234350D0A343735203234330D0A343733203234310D0A343733203234300D0A343733203233390D0A343733203233390D0A343734203233390D0A343734203233390D0A373736203431370D0A373736203431370D0A373735203431380D0A373735203431380D0A373734203431380D0A373733203431360D0A373732203431340D0A373730203431300D0A373639203430360D0A373637203430320D0A373635203339360D0A373632203339300D0A373630203338320D0A373537203337340D0A373533203336350D0A373439203335350D0A373434203334350D0A373430203333350D0A373335203332340D0A373331203331330D0A373237203330320D0A373232203239310D0A373139203238300D0A373135203236390D0A373132203235370D0A373038203234350D0A373035203233340D0A373032203232320D0A363939203231300D0A363937203139390D0A363935203138380D0A363934203137370D0A363934203136370D0A363934203135360D0A363935203134370D0A363936203133380D0A363938203133300D0A373032203132320D0A373036203131350D0A373130203130390D0A373136203130340D0A3732342039390D0A3733332039360D0A3734342039330D0A3735372039320D0A3736392039330D0A3738322039350D0A3739362039370D0A383038203130310D0A383232203130350D0A383334203131300D0A383435203131350D0A383534203132310D0A383632203132380D0A383638203133360D0A383733203134340D0A383736203135320D0A383738203136300D0A383739203136380D0A383739203137370D0A383738203138350D0A383736203139330D0A383733203230310D0A383639203230380D0A383634203231340D0A383539203232300D0A383531203232350D0A383432203232380D0A383330203233300D0A383137203233310D0A383032203233310D0A373837203232390D0A373733203232370D0A373633203232350D0A373538203232330D0A373536203232330D0A373536203232330D0A300D0A34310D0A39330D0A3132300D0A
+
+Bonus: If you really need to save space on disk/in database use this instead of built-in SigWeb/SigPlus compression, this is same example SigString that was uncompressed, and then compressed using PHP's built-in gzdeflate function, you actually get even smaller output this way:
+
+��Kr!���LU��������pq�y�h Y���o��e��U���i&I �E���?��r?�,Ҏo�IU#) {WsRTH���HSu"�N2I��� �!��DH��Άy\��$�2vs�u�H�,�ag��H��z�9vM"�?�E�qVw��s�rX^d�'H���<}fu*$2?�{\�W��`9����~�v��ݚ�^o���#-��Iz�Y_����Ÿ4�5� � )DA����@�����N�$�����l;  vU��쐓(�F)�?� 11l�01Q�#���Z��:��Q���U��~�yn��� ����;|)j��[.$��.���̾��������q��i�o��_�)�7�<&1�t���s�t�i�+���@ �\�Y����v ~��Nơ�q��0���Ŋ�p������`�d�@ r��M��B;�1��ZYU�9��yއ��,�{�θb��ð�1��t�<@���9%Lu&�R����[(T�a��F�+k,z�PA:o\�ӧ&b*�*i?������Q�(�
+
+Now, I want to explain the SigString format (base on my sample SigString).
+Below is output of raw string, right after hex2bin conversion (cropped for readability):
+
+197
+4
+451 481
+450 480
+450 479
+450 477
+450 474
+451 470
+451 464
+452 458
+...
+787 229
+773 227
+763 225
+758 223
+756 223
+756 223
+0
+41
+93
+120
+
+Note we actually have 4 segments here:
+- line 1 (sample: 197) is amount of coordinates or "points" we have in our signature file, those are number pairs that will start at line 3
+- line 2 (sample: 4) is number of lines we have, or better said, number of breaking points we keep, and those are single-number entries at very end of file (in this sample: 0/41/93/120)
+- line 3 onwards we have all those (197) lines with coordinate pairs, logically, this will be as small or as long of a list as your signature actually has. To make it absolutely clear, if line 1 said "5" you would have just 5 pairs, if line 1 said 2999 you'd have 2999 pairs
+- at end of file we finally have segment with list of those breaking points or end-points that were enumerated by line 2. Again, if line 2 said "3" you would have 3 single-number lines at end of your file, if line 2 said "899" then you would have huge list of 899 single-number lines at end of your file.
+
+As you see from this description, we need to read those first two lines to get started. Later in Scott's code those will be array members, thats arr[0] and arr[1].
+Using those two numbers, we can slice the signature into two arrays, one with coordinate pairs, and other with lines, or more correctly - line endings. You slice it in a number of ways, just keep in mind the format of Sigstring layout.
+
+Using this example we first split the hex2bin result into array, based on provided sample SigString:
+["197","4","451 481","450 480","450 479","450 477","450 474","451 470","451 464","452 458","454 450","456 442","459 433","463 423","467 413","471 403","475 392","478 381","480 369","482 357","484 344","485 331","485 318","486 304","486 291","486 277","487 262","487 248","487 233","487 218","487 204","489 190","491 176","494 163","497 150","502 138","506 127","510 117","514 108","517 102","518 99","519 98","519 98","521 96","521 95","522 94","523 93","524 91","525 91","526 91","527 92","527 94","528 97","529 100","530 105","532 112","534 119","537 127","540 135","544 143","548 153","554 163","560 174","567 188","575 201","582 214","588 228","594 242","599 256","604 270","609 284","613 299","616 313","619 326","621 340","623 354","624 368","625 381","626 394","627 406","628 417","629 428","630 438","631 448","631 456","631 463","631 469","630 473","630 477","630 478","629 479","628 479","628 479","628 479","628 479","602 247","601 247","599 249","597 251","594 254","590 256","586 258","580 260","573 260","565 261","555 260","544 260","533 258","522 257","511 255","502 253","494 251","487 249","482 247","478 245","475 243","473 241","473 240","473 239","473 239","474 239","474 239","776 417","776 417","775 418","775 418","774 418","773 416","772 414","770 410","769 406","767 402","765 396","762 390","760 382","757 374","753 365","749 355","744 345","740 335","735 324","731 313","727 302","722 291","719 280","715 269","712 257","708 245","705 234","702 222","699 210","697 199","695 188","694 177","694 167","694 156","695 147","696 138","698 130","702 122","706 115","710 109","716 104","724 99","733 96","744 93","757 92","769 93","782 95","796 97","808 101","822 105","834 110","845 115","854 121","862 128","868 136","873 144","876 152","878 160","879 168","879 177","878 185","876 193","873 201","869 208","864 214","859 220","851 225","842 228","830 230","817 231","802 231","787 229","773 227","763 225","758 223","756 223","756 223","0","41","93","120",""]
+
+Then slice that array into one array containing just "coords" values (note that from original array we ommit first two elements that were just descriptors, and number of elements in new array is as long as first element of original array said it will be):
+["451 481","450 480","450 479","450 477","450 474","451 470","451 464","452 458","454 450","456 442","459 433","463 423","467 413","471 403","475 392","478 381","480 369","482 357","484 344","485 331","485 318","486 304","486 291","486 277","487 262","487 248","487 233","487 218","487 204","489 190","491 176","494 163","497 150","502 138","506 127","510 117","514 108","517 102","518 99","519 98","519 98","521 96","521 95","522 94","523 93","524 91","525 91","526 91","527 92","527 94","528 97","529 100","530 105","532 112","534 119","537 127","540 135","544 143","548 153","554 163","560 174","567 188","575 201","582 214","588 228","594 242","599 256","604 270","609 284","613 299","616 313","619 326","621 340","623 354","624 368","625 381","626 394","627 406","628 417","629 428","630 438","631 448","631 456","631 463","631 469","630 473","630 477","630 478","629 479","628 479","628 479","628 479","628 479","602 247","601 247","599 249","597 251","594 254","590 256","586 258","580 260","573 260","565 261","555 260","544 260","533 258","522 257","511 255","502 253","494 251","487 249","482 247","478 245","475 243","473 241","473 240","473 239","473 239","474 239","474 239","776 417","776 417","775 418","775 418","774 418","773 416","772 414","770 410","769 406","767 402","765 396","762 390","760 382","757 374","753 365","749 355","744 345","740 335","735 324","731 313","727 302","722 291","719 280","715 269","712 257","708 245","705 234","702 222","699 210","697 199","695 188","694 177","694 167","694 156","695 147","696 138","698 130","702 122","706 115","710 109","716 104","724 99","733 96","744 93","757 92","769 93","782 95","796 97","808 101","822 105","834 110","845 115","854 121","862 128","868 136","873 144","876 152","878 160","879 168","879 177","878 185","876 193","873 201","869 208","864 214","859 220","851 225","842 228","830 230","817 231","802 231","787 229","773 227","763 225","758 223","756 223","756 223"]
+
+And we finish slicing by creating one other array containing "lines" values (again, length of this array is to be cut as long as second element of original array says to):
+["0","41","93","120"]
+
+Now, in the code you will see I made a fix, so my actuall "lines[]" array prints this:
+["0","41","93","120","197"]
+Note that my code-fix added that "197" there at end. That isn't in original signature's end, right? But we still know that from signature's first line, we know it has 197 points, so I just concatenated that to array.
+Why do that?
+
+Our example signature is simple two letters - "AP" - and has just 4 lines:
+- coordinates 0 through 41
+- coordinates 42 through 93
+- coordinates 94 through 120
+- and... 121 through 197
+
+That last one isn't clearly described, as it should be obvious, it simply goes from previous line's end (120 + 1) till end of coordinate list.
+But, well, depending how you do the following steps, your code may or may not need that "197" in lines[] array. For original code to be fixed with minimum changes we need that '197' to be there in array, so that foreach loop can write that last line correctly.
+We could've fixed it in several obvious ways:
+- if it is last element in for-each, do different code that uses $done + $arr[0]
+- we could not need the "lines" as such at all, as you will see in my bonus "HTML5 canvas" code, you don't actually define line start/end as in SVG, you just move your pencil, but sometimes it's moved "on paper" sometimes "in the air"
+- etc
+As explained, you just need to make sure you use all of your coordinates, and to correct original code this was the easiest way (one-liner) without a more through rewrite.
+
+Knowing what we have now, Scott elected for a solution that included another slicing code. He is slicing our coords[] array to separate lines, well, polylines, that he later outputs to SVG. Due to SVG's format, this is actually the prefered way, or at least I see it as such when looking at how Scott did it and what SVG actually looks like inside HTML as end product.
+But unfortunately, original code had 2 mistakes (that took me 2 days to solve :) ).
+One mistake was lacking that last line, and depending on your sample signature it may not be obvious. My first sample had just a dot (signature with "i" letters, so whoever signed it did the dots on the "i" literally at the end, so it wasn't noticable at all, just one dot missing). But this "AP" sample I am providing here actually has whole letter "P" as last line, so missing whole letter made it quite obvious. Anyway, I explained how I fixed that so moving on to second issue.
+The other bug was that wrong value was used for slice lengths when slicing to segments/polylines. It actually used the last point to slice it, but array_slice PHP function expects (array, starting point, length) and Scott probably expected it to be (array, starting point, ending point). This too was subtle in some signature samples. What essentially happened was some of the points being re-used, but if you write a line on top of a line, it doesn't matter (specially in perfect digital drawing). But! by re-using coordinates, it sometimes extended one line over the path of two or more lines combined, essentially negating what was ment to happen when "pen" was "in the air", and suddenly all signatures looked as if pen was never removed from paper. Eg. the "dot" on the "i" would be a line connecting "i" and the "dot" (or worse even if you wrote "line" and dotted your "i" after last letter, it would connect the dot with "e", now that's making it pop out)
+
+I fixed that, so now it slices something like this (based on output of my example SigString again):
+line = 1 , linevalue = 41 , done = 0 , linelength = 41
+line = 2 , linevalue = 93 , done = 41 , linelength = 52
+line = 3 , linevalue = 120 , done = 93 , linelength = 27
+line = 4 , linevalue = 197 , done = 120 , linelength = 77
+
+I left my sample uncompressed SigString in the code, as well as whole bunch of echos commented out in the code, if you uncomment those you will see this whole process laid out in front of you step by step. And if you comment/uncomment parts of fixed code, you will see same with Scott's version as well, to compare.
+
+I made comments at lines I added, and if it was a change od Scott's line I left his line commented right above my fixed line so you can compare easily.
+I did not mark all mine vs. his comments, as those can be skipped anyway, my comments just supplement the explanation or explain my changes.
+
+Here is also a link to my GitHub repo, so you can see code there as well.
+If it's not working for you please leave a comment here or raise an issue at GitHub.
+
+Now on to code finally, sorry it took this long. You can just copy/paste whole thing to http://phpfiddle.org/ to see it in action
+
+--- COPY/PASTE EVERYTHING BELOW TO PHPFIDDLE.ORG ---
+
+<?php
+
+//				My changes marked with comment ->	//	fix by LuxZg 08.05.2020.
+
+		//Requires $SigString and accepts optional filename.
+		//$SigString has to be UNCOMPRESSED and UNENCRYPTED	//	by LuxZg 08.05.2020.
+		//If filename is supplied the image will be written to that file
+		//If no filename is supplied the SVG image will be returned as a string which can be echoed out directly
+
+		function sigstring2svg($SigString, $filename = NULL)
+		{
+			$raw = hex2bin($SigString);	//Convert Hex
+			$raw = str_ireplace(array("\r",'\r'),'', $raw);	//	fix by LuxZg 08.05.2020. - hex2bin generated code with \r\n both being used
+				//	so after exploding it, the \r would be left, sometimes causing more bugs, but otherwise unseen unless encoded to eg. JSON
+
+//			print the binary format
+//			echo '<br><br>First we echo raw string, after hex2bin conversion:<br><br>';
+//			echo '<pre>'.$raw.'</pre>';	//	this didn't show \r\n
+//			echo '<pre>'.json_encode($raw).'</pre>';	//	this did show \r\n , and after fix now shows just \n, which is now OK for the next step
+
+			$arr = explode(PHP_EOL, $raw);	//Split into array
+			if ($arr[1] > 0) { //Check if signature is empty
+					$coords = array_slice($arr, 2, $arr[0]);	//Separate off coordinate pairs	// keep in mind SigString format is: coordinate amount - amount of lines - coordinate pairs - end-points of lines
+																								// also get to know your array_slice format: array name - start of slice - length of slice
+					$lines = array_slice($arr, ($arr[0] + 2), $arr[1]);	//Separate off number of coordinates pairs per stroke
+					$lines[] = $arr[0];	// fix by LuxZg - 08.05.2020. - later code needs last coordinate added to array, so last slice/SVG segment isn't ommited by mistake
+
+//					bunch of echoes below, not needed, except to learn/understand, note that to see \r and/or \n you need to use json_encode, that's why I left both, to debug the error Scott's code had
+//					echo '<br><br>Arr[] values:<br><br>';
+//					echo '<pre>';
+//					print_r(array_values($arr));
+//					print_r(json_encode($arr));
+//					echo '</pre>';
+//					echo '<br><br>Coords[] values:<br><br>';
+//					echo '<pre>';
+//					print_r(array_values($coords));
+//					print_r(json_encode($coords));
+//					echo '</pre>';
+//					echo '<pre>';
+//					echo '<br><br>Lines[] values:<br><br>';
+//					print_r(array_values($lines));
+//					print_r(json_encode($lines));
+//					echo '</pre><br><br>';
+
+					if ($arr[1] == 1) {
+							$lines[] = ($arr[0] + 2);	//If there is only 1 line the end has to be marked
+						}
+					$done = 0;
+//					we always start at zero, it's first member of array, first coordinate we use
+
+					foreach ($lines as $line => $linevalue) {
+							if ($linevalue > $done) {
+									$linelength = $linevalue-$done;	//	fix by LuxZg 08.05.2020. - we need to know where slice ends, so we use the "done" of previous line as our new start
+																	//	and we know where we need to end, so length is simple math
+//									$strokes[$line] = array_slice($coords, $done, $linevalue);	//Split coordinate pairs into separate strokes	//	end of line is wrong
+																								//	it was including too many lines/coordinates in each iteration, again and again, so I fixed it, left this for comparison
+									$strokes[$line] = array_slice($coords, $done, $linelength);	//Split coordinate pairs into separate strokes	//	fix by LuxZg 08.05.2020. - end of slice is now length of line, as should be
+								}
+
+//							just an echo to see what's actually happening and also why we needed to add that one last point in our lines[] array earlier
+//							echo "<br>line = ".$line." , linevalue = ".$linevalue." , done = ".$done." , linelength = ".$linelength."<br>";
+
+							$done = $linevalue;	//	we set new value to $done as next line will start from there
+						}
+
+//				I did not touch anything else in this PHP function, from this point below ! SVG drawing code is great!
+
+					//Split X and Y to calculate the maximum and minimum coordinates on both axis
+					$xmax = 0;
+					$xmin = 999999;
+					$ymax = 0;
+					$ymin = 999999;
+					foreach ($strokes as $stroke => $xycoords) {
+							foreach ($xycoords as $xycoord) {
+									$xyc = explode(' ', $xycoord);
+									$xy[$stroke]['x'][] = $xyc[0];
+									if ($xyc[0] > $xmax) $xmax = $xyc[0];
+									if ($xyc[0] < $xmin) $xmin = $xyc[0];
+									$xy[$stroke]['y'][] = $xyc[1];
+									if ($xyc[1] > $ymax) $ymax = $xyc[1];
+									if ($xyc[1] < $ymin) $ymin = $xyc[1];
+							}
+					}
+					//Add in 10 pixel border to allow for stroke
+					$xmax += 10;
+					$xmin -= 10;
+					$ymax += 10;
+					$ymin -= 10;
+					//Calculate the canvas size and offset out anything below the minimum value to trim whitespace from top and left
+					$xmax -= $xmin;
+					$ymax -= $ymin;
+
+					//Iterate through each stroke and each coordinate pair to make the points on the stroke to build each polyline as a string array
+					foreach ($xy as $lines => $axis) {
+							$polylines[$lines] = '<polyline class="sig" points="';
+							foreach ($xy[$lines]['x'] as $point => $val) {
+									$x = $xy[$lines]['x'][$point];
+									$y = $xy[$lines]['y'][$point];
+									$polylines[$lines] .= ($x - $xmin) . ',' . ($y - $ymin) . ' ';
+							}
+							$polylines[$lines] .= '"/>';
+					}
+
+					//Build SVG image string
+					$image = '
+						<svg id="sig" data-name="sig" xmlns="http://www.w3.org/2000/svg" width="' . $xmax . '" height="' . $ymax . '" viewBox="0 0 ' . $xmax . ' ' . $ymax . '">
+							<defs>
+								<style>
+									.sig {
+										fill: none;
+										stroke: #000;
+										stroke-linecap: round;
+										stroke-linejoin: round;
+										stroke-width: 4px;
+									}
+								</style>
+							</defs>
+							<title>Signature</title>
+							<g>
+								';
+								foreach ($polylines as $polyline) {
+										$image .= $polyline;
+								}
+								$image .= '
+							</g>
+						</svg>';
+
+					//If file name is supplied write to file
+					if ($filename) {
+							try {
+									$file = fopen($filename, 'w');
+									fwrite($file, $image);
+									fclose($file);
+									return $filename;
+							} catch (Exception $e) {
+									return false;
+							}
+					} else {
+							//If file name is not supplied return the SVG image as a string
+							return $image;
+					}
+				} else {
+						return "Signature is empty";
+				}
+		}
+
+//				OK to complete the example I actually use the function
+
+		//	this is my simple example "AP" signature, all decompressed and ready to be put through function
+		$sigdec = '3139370D0A340D0A343531203438310D0A343530203438300D0A343530203437390D0A343530203437370D0A343530203437340D0A343531203437300D0A343531203436340D0A343532203435380D0A343534203435300D0A343536203434320D0A343539203433330D0A343633203432330D0A343637203431330D0A343731203430330D0A343735203339320D0A343738203338310D0A343830203336390D0A343832203335370D0A343834203334340D0A343835203333310D0A343835203331380D0A343836203330340D0A343836203239310D0A343836203237370D0A343837203236320D0A343837203234380D0A343837203233330D0A343837203231380D0A343837203230340D0A343839203139300D0A343931203137360D0A343934203136330D0A343937203135300D0A353032203133380D0A353036203132370D0A353130203131370D0A353134203130380D0A353137203130320D0A3531382039390D0A3531392039380D0A3531392039380D0A3532312039360D0A3532312039350D0A3532322039340D0A3532332039330D0A3532342039310D0A3532352039310D0A3532362039310D0A3532372039320D0A3532372039340D0A3532382039370D0A353239203130300D0A353330203130350D0A353332203131320D0A353334203131390D0A353337203132370D0A353430203133350D0A353434203134330D0A353438203135330D0A353534203136330D0A353630203137340D0A353637203138380D0A353735203230310D0A353832203231340D0A353838203232380D0A353934203234320D0A353939203235360D0A363034203237300D0A363039203238340D0A363133203239390D0A363136203331330D0A363139203332360D0A363231203334300D0A363233203335340D0A363234203336380D0A363235203338310D0A363236203339340D0A363237203430360D0A363238203431370D0A363239203432380D0A363330203433380D0A363331203434380D0A363331203435360D0A363331203436330D0A363331203436390D0A363330203437330D0A363330203437370D0A363330203437380D0A363239203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363032203234370D0A363031203234370D0A353939203234390D0A353937203235310D0A353934203235340D0A353930203235360D0A353836203235380D0A353830203236300D0A353733203236300D0A353635203236310D0A353535203236300D0A353434203236300D0A353333203235380D0A353232203235370D0A353131203235350D0A353032203235330D0A343934203235310D0A343837203234390D0A343832203234370D0A343738203234350D0A343735203234330D0A343733203234310D0A343733203234300D0A343733203233390D0A343733203233390D0A343734203233390D0A343734203233390D0A373736203431370D0A373736203431370D0A373735203431380D0A373735203431380D0A373734203431380D0A373733203431360D0A373732203431340D0A373730203431300D0A373639203430360D0A373637203430320D0A373635203339360D0A373632203339300D0A373630203338320D0A373537203337340D0A373533203336350D0A373439203335350D0A373434203334350D0A373430203333350D0A373335203332340D0A373331203331330D0A373237203330320D0A373232203239310D0A373139203238300D0A373135203236390D0A373132203235370D0A373038203234350D0A373035203233340D0A373032203232320D0A363939203231300D0A363937203139390D0A363935203138380D0A363934203137370D0A363934203136370D0A363934203135360D0A363935203134370D0A363936203133380D0A363938203133300D0A373032203132320D0A373036203131350D0A373130203130390D0A373136203130340D0A3732342039390D0A3733332039360D0A3734342039330D0A3735372039320D0A3736392039330D0A3738322039350D0A3739362039370D0A383038203130310D0A383232203130350D0A383334203131300D0A383435203131350D0A383534203132310D0A383632203132380D0A383638203133360D0A383733203134340D0A383736203135320D0A383738203136300D0A383739203136380D0A383739203137370D0A383738203138350D0A383736203139330D0A383733203230310D0A383639203230380D0A383634203231340D0A383539203232300D0A383531203232350D0A383432203232380D0A383330203233300D0A383137203233310D0A383032203233310D0A373837203232390D0A373733203232370D0A373633203232350D0A373538203232330D0A373536203232330D0A373536203232330D0A300D0A34310D0A39330D0A3132300D0A';
+
+		//	Bonus:
+		//		if you will need to keep SigString size down, rather use PHP's gzdeflate or anything similar
+		//		just don't forget if you later pull the compressed sig data from eg. database, to decompress it before sending it to SVG function
+		//	$sigdecgz = gzdeflate($sigdec,9);
+
+//		you can use these echos to see sample SigString
+//		echo 'Printing decompressed SigString ; SetSigCompressionMode(0) :<br><br>';
+//		echo $sigdec;
+
+//		print the output of sigstring2svg, so my sample "AP" SigString, shown in SVG format, using slightly modified Scott's code
+		echo '<br><br>Printing output of sigstring2svg() function, SigString as SVG (of decompressed & unencrypted signature !):<br><br>';
+		echo sigstring2svg($sigdec);
+		echo '<br><br>';
+
+?>
+
+OK, done with PHP ... but there is one more bonus for you folks!
+I re-used same PHP code to actually draw the signature in HTML5 canvas, similar as the original SigWeb component does, but without using Topaz APIs/components.
+I've re-used the PHP code to do the initial hex2bin and slicing
+It is somewhat shorter this way, though not as polished as Scott's SVG.
+Tested, works all nice even on combination of Ubuntu / Apache / PHP web server, with Android phone as client, so no Windows involved.
+
+<script type="text/javascript">
+	//	LuxZg - 08.05.2020.
+	function cCanvas()
+		{
+
+			<?php
+
+				//	sample signature, this SigString is hardcoded for example, you'd probably pull it from a database on server, hence PHP still makes sense for this step
+				$sg = '3139370D0A340D0A343531203438310D0A343530203438300D0A343530203437390D0A343530203437370D0A343530203437340D0A343531203437300D0A343531203436340D0A343532203435380D0A343534203435300D0A343536203434320D0A343539203433330D0A343633203432330D0A343637203431330D0A343731203430330D0A343735203339320D0A343738203338310D0A343830203336390D0A343832203335370D0A343834203334340D0A343835203333310D0A343835203331380D0A343836203330340D0A343836203239310D0A343836203237370D0A343837203236320D0A343837203234380D0A343837203233330D0A343837203231380D0A343837203230340D0A343839203139300D0A343931203137360D0A343934203136330D0A343937203135300D0A353032203133380D0A353036203132370D0A353130203131370D0A353134203130380D0A353137203130320D0A3531382039390D0A3531392039380D0A3531392039380D0A3532312039360D0A3532312039350D0A3532322039340D0A3532332039330D0A3532342039310D0A3532352039310D0A3532362039310D0A3532372039320D0A3532372039340D0A3532382039370D0A353239203130300D0A353330203130350D0A353332203131320D0A353334203131390D0A353337203132370D0A353430203133350D0A353434203134330D0A353438203135330D0A353534203136330D0A353630203137340D0A353637203138380D0A353735203230310D0A353832203231340D0A353838203232380D0A353934203234320D0A353939203235360D0A363034203237300D0A363039203238340D0A363133203239390D0A363136203331330D0A363139203332360D0A363231203334300D0A363233203335340D0A363234203336380D0A363235203338310D0A363236203339340D0A363237203430360D0A363238203431370D0A363239203432380D0A363330203433380D0A363331203434380D0A363331203435360D0A363331203436330D0A363331203436390D0A363330203437330D0A363330203437370D0A363330203437380D0A363239203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363238203437390D0A363032203234370D0A363031203234370D0A353939203234390D0A353937203235310D0A353934203235340D0A353930203235360D0A353836203235380D0A353830203236300D0A353733203236300D0A353635203236310D0A353535203236300D0A353434203236300D0A353333203235380D0A353232203235370D0A353131203235350D0A353032203235330D0A343934203235310D0A343837203234390D0A343832203234370D0A343738203234350D0A343735203234330D0A343733203234310D0A343733203234300D0A343733203233390D0A343733203233390D0A343734203233390D0A343734203233390D0A373736203431370D0A373736203431370D0A373735203431380D0A373735203431380D0A373734203431380D0A373733203431360D0A373732203431340D0A373730203431300D0A373639203430360D0A373637203430320D0A373635203339360D0A373632203339300D0A373630203338320D0A373537203337340D0A373533203336350D0A373439203335350D0A373434203334350D0A373430203333350D0A373335203332340D0A373331203331330D0A373237203330320D0A373232203239310D0A373139203238300D0A373135203236390D0A373132203235370D0A373038203234350D0A373035203233340D0A373032203232320D0A363939203231300D0A363937203139390D0A363935203138380D0A363934203137370D0A363934203136370D0A363934203135360D0A363935203134370D0A363936203133380D0A363938203133300D0A373032203132320D0A373036203131350D0A373130203130390D0A373136203130340D0A3732342039390D0A3733332039360D0A3734342039330D0A3735372039320D0A3736392039330D0A3738322039350D0A3739362039370D0A383038203130310D0A383232203130350D0A383334203131300D0A383435203131350D0A383534203132310D0A383632203132380D0A383638203133360D0A383733203134340D0A383736203135320D0A383738203136300D0A383739203136380D0A383739203137370D0A383738203138350D0A383736203139330D0A383733203230310D0A383639203230380D0A383634203231340D0A383539203232300D0A383531203232350D0A383432203232380D0A383330203233300D0A383137203233310D0A383032203233310D0A373837203232390D0A373733203232370D0A373633203232350D0A373538203232330D0A373536203232330D0A373536203232330D0A300D0A34310D0A39330D0A3132300D0A';
+
+				//	short version of PHP code
+
+				//	convert hex to bin
+				$raw = hex2bin($sg);
+				//	cleanup double new-line after hex2bin conversion (\r\n)
+				$raw = str_ireplace(array("\r",'\r'),'', $raw);
+				//	exploding cleaned string to array
+				$arr = explode(PHP_EOL, $raw);
+				//	slicing coords to it's array
+				$coords = array_slice($arr, 2, $arr[0]);
+					//	doing json encode to convert PHP array to JS array
+					$js_array_a = json_encode($coords);
+					//	echoing it as JS
+					echo "var coords = ". $js_array_a . ";\n";
+				//	slicing line endings to it's array
+				$lines = array_slice($arr, ($arr[0] + 2), $arr[1]); //Separate off number of coordinates pairs per stroke
+					//	and convert and echo to JSON as JS array for this as well
+					$js_array_b = json_encode($lines);
+					echo "var lines = ". $js_array_b . ";\n";
+
+				//	server side done
+
+			?>
+
+			//	now short client side JavaScript code
+
+			//	define canvas that has HTML id = "c"; use any id just don't forget to change where needed
+			var canvas = document.getElementById("c");
+			//	and canvas' context
+			var context = canvas.getContext("2d");
+			//	get the coords array length
+			var arrayLength = coords.length;
+			//	initialize variables used in for loop
+			var coordx = '';
+			var coordy = '';
+			var tocoords = [];
+
+			//	putting coordinates/lines on canvas
+
+			//	for all coordinates in the coords array
+			for (var i = 0; i < arrayLength; i++) {
+					//	we split each coordinate to X & Y, can be shortened, this is for readability
+					tocoords = coords[i].split(" ");
+					coordx = tocoords[0];
+					coordy = tocoords[1];
+
+					//	if we encounter coord that is mentioned in lines[] array
+					//	it means line END, so we make a MOVE instead of drawing line, using moveTo() that coordinate
+					if (lines.includes(String(i)))
+						{
+							context.moveTo(coordx, coordy);
+						}
+					//	otherwise, we DRAW the line between points on canvas, using lineTo() that coordinate
+					else
+						{
+							context.lineTo(coordx, coordy);
+						}
+				}
+
+			//	at the end we have to define the color of the signature in the canvas
+			context.strokeStyle = "#000000";	//	black
+			//	and the thickness of the line, as you feel appropriate
+			context.lineWidth = "3";
+			//	and finally tell browser to make our lines into stroke, which is effectively command that shows signature in the canvas
+			context.stroke();
+
+			//	this ends client-side code, and we need just some basic HTML markup to execute it
+		}
+
+</script>
+
+<br>
+<div style="color:red; font-size:25px;" onclick="javascript:cCanvas()">Click to show signature</div>
+<br>
+Canvas is below, press button to show signature:
+<br>
+<canvas name="c" id="c" height="600" width="1500" ></canvas>
+<br>
+
+<!--
+Canvas is fixed size, which is the unpolished part. You MAY have signature larger or smaller than this canvas. If you need, expand canvas till your signature fits.
+If someone feels like it, you could make code similar to what's in PHP example, and search for min/max of X and Y coordinates, then fit the signature inside.
+I spent 2 days on this project, so I'm good for now, but if we decide to use canvas and make the appropriate code I will edit this answer.
+-->
