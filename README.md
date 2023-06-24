@@ -28,3 +28,9 @@ Due to PHP being relatively popular and easy, following the embedded instruction
 Stack Overflow answer explains whole Topaz signature string format.
 
 If anyone ports this code to Python (or anything else for that matter), please make me aware so I can link it in this readme.
+
+Edit 06/2023:
+@ChadJPetersen ported it to TypeScript (see Issue #1)
+
+Link to code:
+https://gist.github.com/ChadJPetersen/7b1bac66c301f076877c3d917844c7d4
